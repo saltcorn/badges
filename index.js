@@ -92,7 +92,6 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
   const relSplit = relation.split(".");
   if (relSplit.length === 3) {
     const [relTableNm, relField, valField] = relSplit;
-    //db.sql_log({ relTableNm, relField, valField, relation });
 
     const relTable = await Table.findOne({ name: relTableNm });
     const rows = await relTable.getJoinedRows({
@@ -104,24 +103,31 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
       .join("&nbsp;");
   } else {
     const [relTableNm, relField, joinFieldNm, valField] = relSplit;
+    const table = await Table.findOne({ id: table_id });
 
     const relTable = await Table.findOne({ name: relTableNm });
     await relTable.getFields();
     const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
-    const rows = await relTable.getJoinedRows({
-      where: { [relField]: id },
+    //db.sql_log({ relTableNm, relField, valField, relation });
+
+    const rows = await table.getJoinedRows({
+      where: { id },
       aggregations: {
         _badges: {
           table: joinField.reftable_name,
-          ref: joinFieldNm,
+          ref: "id",
+          subselect: {
+            field: joinFieldNm,
+            table: relTable,
+            whereField: relField,
+          },
           field: valField,
           aggregate: "ARRAY_AGG",
         },
       },
     });
-
-    return rows
-      .map((row) => span({ class: "badge badge-secondary" }, row[valField]))
+    return rows[0]._badges
+      .map((b) => span({ class: "badge badge-secondary" }, b))
       .join("&nbsp;");
   }
 };
@@ -129,28 +135,60 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
   const tbl = await Table.findOne({ id: table_id });
   const fields = await tbl.getFields();
   const qstate = await stateFieldsToWhere({ fields, state });
-  const [relTableNm, relField, valField] = relation.split(".");
-  const relTable = await Table.findOne({ name: relTableNm });
-  const rows = await tbl.getJoinedRows({
-    where: qstate,
-    aggregations: {
-      _badges: {
-        table: relTableNm,
-        ref: relField,
-        field: valField,
-        aggregate: "ARRAY_AGG",
+  const relSplit = relation.split(".");
+  if (relSplit.length === 3) {
+    const [relTableNm, relField, valField] = relSplit;
+    const rows = await tbl.getJoinedRows({
+      where: qstate,
+      aggregations: {
+        _badges: {
+          table: relTableNm,
+          ref: relField,
+          field: valField,
+          aggregate: "ARRAY_AGG",
+        },
       },
-    },
-    ...(extra && extra.orderBy && { orderBy: extra.orderBy }),
-    ...(extra && extra.orderDesc && { orderDesc: extra.orderDesc }),
-  });
-  db.sql_log(rows);
-  return rows.map((row) => ({
-    html: row._badges
-      .map((b) => span({ class: "badge badge-secondary" }, b))
-      .join("&nbsp;"),
-    row,
-  }));
+      ...(extra && extra.orderBy && { orderBy: extra.orderBy }),
+      ...(extra && extra.orderDesc && { orderDesc: extra.orderDesc }),
+    });
+    db.sql_log(rows);
+    return rows.map((row) => ({
+      html: row._badges
+        .map((b) => span({ class: "badge badge-secondary" }, b))
+        .join("&nbsp;"),
+      row,
+    }));
+  } else {
+    const [relTableNm, relField, joinFieldNm, valField] = relSplit;
+
+    const relTable = await Table.findOne({ name: relTableNm });
+    await relTable.getFields();
+    const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
+    //db.sql_log({ relTableNm, relField, valField, relation });
+
+    const rows = await tbl.getJoinedRows({
+      where: qstate,
+      aggregations: {
+        _badges: {
+          table: joinField.reftable_name,
+          ref: "id",
+          subselect: {
+            field: joinFieldNm,
+            table: relTable,
+            whereField: relField,
+          },
+          field: valField,
+          aggregate: "ARRAY_AGG",
+        },
+      },
+    });
+    return rows.map((row) => ({
+      html: row._badges
+        .map((b) => span({ class: "badge badge-secondary" }, b))
+        .join("&nbsp;"),
+      row,
+    }));
+  }
 };
 module.exports = {
   sc_plugin_api_version: 1,
