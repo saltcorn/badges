@@ -25,6 +25,7 @@ const configuration_workflow = () =>
         name: "views",
         form: async (context) => {
           const table = await Table.findOne({ id: context.table_id });
+          const mytable = table;
           const fields = await table.getFields();
           const {
             child_field_list,
@@ -40,6 +41,25 @@ const configuration_workflow = () =>
                 );
               });
           });
+          for (const { table, key_field } of child_relations) {
+            const keyFields = table.fields.filter(
+              (f) =>
+                f.type === "Key" &&
+                ![mytable.name, "users", "_sc_files"].includes(f.reftable_name)
+            );
+            for (const kf of keyFields) {
+              const joined_table = await Table.findOne({
+                name: kf.reftable_name,
+              });
+              if (!joined_table) continue;
+              await joined_table.getFields();
+              joined_table.fields.forEach((jf) => {
+                agg_field_opts.push(
+                  `${table.name}.${key_field.name}.${kf.name}.${jf.name}`
+                );
+              });
+            }
+          }
           return new Form({
             fields: [
               {
@@ -67,18 +87,43 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
 ];
 
 const run = async (table_id, viewname, { relation }, state, extra) => {
-  const [relTableNm, relField, valField] = relation.split(".");
-  //db.sql_log({ relTableNm, relField, valField, relation });
   const { id } = state;
   if (!id) return "need id";
-  const relTable = await Table.findOne({ name: relTableNm });
-  const rows = await relTable.getJoinedRows({
-    where: { [relField]: id },
-  });
+  const relSplit = relation.split(".");
+  if (relSplit.length === 3) {
+    const [relTableNm, relField, valField] = relSplit;
+    //db.sql_log({ relTableNm, relField, valField, relation });
 
-  return rows
-    .map((row) => span({ class: "badge badge-secondary" }, row[valField]))
-    .join("&nbsp;");
+    const relTable = await Table.findOne({ name: relTableNm });
+    const rows = await relTable.getJoinedRows({
+      where: { [relField]: id },
+    });
+
+    return rows
+      .map((row) => span({ class: "badge badge-secondary" }, row[valField]))
+      .join("&nbsp;");
+  } else {
+    const [relTableNm, relField, joinFieldNm, valField] = relSplit;
+
+    const relTable = await Table.findOne({ name: relTableNm });
+    await relTable.getFields();
+    const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
+    const rows = await relTable.getJoinedRows({
+      where: { [relField]: id },
+      aggregations: {
+        _badges: {
+          table: joinField.reftable_name,
+          ref: joinFieldNm,
+          field: valField,
+          aggregate: "ARRAY_AGG",
+        },
+      },
+    });
+
+    return rows
+      .map((row) => span({ class: "badge badge-secondary" }, row[valField]))
+      .join("&nbsp;");
+  }
 };
 const runMany = async (table_id, viewname, { relation }, state, extra) => {
   const tbl = await Table.findOne({ id: table_id });
