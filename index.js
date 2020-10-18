@@ -13,7 +13,10 @@ const Table = require("@saltcorn/data/models/table");
 const Form = require("@saltcorn/data/models/form");
 const Field = require("@saltcorn/data/models/field");
 const db = require("@saltcorn/data/db");
-const { stateFieldsToWhere } = require("@saltcorn/data/plugin-helper");
+const {
+  stateFieldsToWhere,
+  picked_fields_to_query,
+} = require("@saltcorn/data/plugin-helper");
 
 const configuration_workflow = () =>
   new Workflow({
@@ -80,17 +83,27 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
 const runMany = async (table_id, viewname, { relation }, state, extra) => {
   const tbl = await Table.findOne({ id: table_id });
   const fields = await tbl.getFields();
-  const { joinFields, aggregations } = picked_fields_to_query(columns, fields);
   const qstate = await stateFieldsToWhere({ fields, state });
+  const [relTableNm, relField, valField] = relation.split(".");
+  const relTable = await Table.findOne({ name: relTableNm });
   const rows = await tbl.getJoinedRows({
     where: qstate,
-    joinFields,
-    aggregations,
+    aggregations: {
+      _badges: {
+        table: relTableNm,
+        ref: relField,
+        field: valField,
+        aggregate: "ARRAY_AGG",
+      },
+    },
     ...(extra && extra.orderBy && { orderBy: extra.orderBy }),
     ...(extra && extra.orderDesc && { orderDesc: extra.orderDesc }),
   });
+  db.sql_log(rows);
   return rows.map((row) => ({
-    html: span({ class: "badge badge-secondary" }, relation),
+    html: row._badges
+      .map((b) => span({ class: "badge badge-secondary" }, b))
+      .join("&nbsp;"),
     row,
   }));
 };
