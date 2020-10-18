@@ -91,8 +91,10 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
 const run = async (table_id, viewname, { relation }, state, extra) => {
   const { id } = state;
   if (!id) return "need id";
-  db.sql_log(relation);
   const relSplit = relation.split(".");
+  if (relSplit.length < 3) {
+    throw new Error("badges view incorrectly configured. No relation chosen");
+  }
   if (relSplit.length === 3) {
     const [relTableNm, relField, valField] = relSplit;
 
@@ -138,6 +140,9 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
   const fields = await tbl.getFields();
   const qstate = await stateFieldsToWhere({ fields, state });
   const relSplit = relation.split(".");
+  if (relSplit.length < 3) {
+    throw new Error("badges view incorrectly configured. No relation chosen");
+  }
   if (relSplit.length === 3) {
     const [relTableNm, relField, valField] = relSplit;
     const rows = await tbl.getJoinedRows({
