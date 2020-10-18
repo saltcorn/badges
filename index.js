@@ -36,9 +36,10 @@ const configuration_workflow = () =>
             table.fields
               .filter((f) => !f.calculated || f.stored)
               .forEach((f) => {
-                agg_field_opts.push(
-                  `${table.name}.${key_field.name}.${f.name}`
-                );
+                agg_field_opts.push({
+                  name: `${table.name}.${key_field.name}.${f.name}`,
+                  label: `${table.name}.${key_field.name}&#8594;${f.name}`,
+                });
               });
           });
           for (const { table, key_field } of child_relations) {
@@ -54,9 +55,10 @@ const configuration_workflow = () =>
               if (!joined_table) continue;
               await joined_table.getFields();
               joined_table.fields.forEach((jf) => {
-                agg_field_opts.push(
-                  `${table.name}.${key_field.name}.${kf.name}.${jf.name}`
-                );
+                agg_field_opts.push({
+                  label: `${table.name}.${key_field.name}&#8594;${kf.name}&#8594;${jf.name}`,
+                  name: `${table.name}.${key_field.name}.${kf.name}.${jf.name}`,
+                });
               });
             }
           }
@@ -68,7 +70,7 @@ const configuration_workflow = () =>
                 type: "String",
                 required: true,
                 attributes: {
-                  options: agg_field_opts.join(),
+                  options: agg_field_opts,
                 },
               },
             ],
@@ -89,6 +91,7 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
 const run = async (table_id, viewname, { relation }, state, extra) => {
   const { id } = state;
   if (!id) return "need id";
+  db.sql_log(relation);
   const relSplit = relation.split(".");
   if (relSplit.length === 3) {
     const [relTableNm, relField, valField] = relSplit;
