@@ -108,7 +108,6 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
     const relTable = await Table.findOne({ name: relTableNm });
     await relTable.getFields();
     const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
-    //db.sql_log({ relTableNm, relField, valField, relation });
 
     const rows = await table.getJoinedRows({
       where: { id },
@@ -151,7 +150,7 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
       ...(extra && extra.orderBy && { orderBy: extra.orderBy }),
       ...(extra && extra.orderDesc && { orderDesc: extra.orderDesc }),
     });
-    db.sql_log(rows);
+
     return rows.map((row) => ({
       html: row._badges
         .map((b) => span({ class: "badge badge-secondary" }, b))
@@ -164,7 +163,6 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
     const relTable = await Table.findOne({ name: relTableNm });
     await relTable.getFields();
     const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
-    //db.sql_log({ relTableNm, relField, valField, relation });
 
     const rows = await tbl.getJoinedRows({
       where: qstate,
