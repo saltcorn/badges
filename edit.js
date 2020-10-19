@@ -1,4 +1,4 @@
-const { span, button, i, a, script } = require("@saltcorn/markup/tags");
+const { span, button, i, a, script, div } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
 const Table = require("@saltcorn/data/models/table");
@@ -133,22 +133,33 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
   const possibles = await joinedTable.distinctValues(valField);
   const addbadge =
     span(
-      {
-        class: "badge badge-secondary",
-        id: rndid,
-        onclick: `add_badge_${rndid}('${rndid}', ${id})`,
-      },
-      i({ class: "fas fa-lg fa-plus" })
+      { class: "dropdown" },
+      span(
+        {
+          class: "badge badge-secondary dropdown-toggle",
+          "data-toggle": "dropdown",
+          id: rndid,
+          //onclick: `add_badge_${rndid}('${rndid}', ${id})`,
+        },
+        i({ class: "fas fa-lg fa-plus" })
+      ),
+      div(
+        { class: "dropdown-menu", "aria-labelledby": "dropdownMenuButton" },
+        possibles
+          .map((p) =>
+            a(
+              {
+                class: "dropdown-item",
+                onclick: `set_add_badge_${rndid}('${p}')`,
+              },
+              p
+            )
+          )
+          .join("")
+      )
     ) +
-    script(`function add_badge_${rndid}(divid, dbid){
-      $('#'+divid).replaceWith(\`<select style="width:100px"class="form-control-sm" onchange="set_add_badge_${rndid}(this)">
-        <option selected>Choose...</option>
-        ${possibles.map((p) => `<option>${p}</option>`).join("")}       
-      </select>
-     \`)
-  }
-  function set_add_badge_${rndid}(that) {
-    view_post('${viewname}', 'add', {id:'${id}', value: that.value}, function(){location.reload();})
+    script(`function set_add_badge_${rndid}(value) {
+    view_post('${viewname}', 'add', {id:'${id}', value: value}, function(){location.reload();})
   }
   `);
   return existing + addbadge;
