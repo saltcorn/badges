@@ -139,12 +139,13 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
           class: "badge badge-secondary dropdown-toggle",
           "data-toggle": "dropdown",
           id: rndid,
-          //onclick: `add_badge_${rndid}('${rndid}', ${id})`,
+          "aria-haspopup": "true",
+          "aria-expanded": "false",
         },
         i({ class: "fas fa-lg fa-plus" })
       ),
       div(
-        { class: "dropdown-menu", "aria-labelledby": "dropdownMenuButton" },
+        { class: "dropdown-menu", "aria-labelledby": rndid },
         possibles
           .map((p) =>
             a(
@@ -190,7 +191,6 @@ const add = async (table_id, viewname, { relation }, { id, value }) => {
   await joinTable.getFields();
   const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
   const joinedTable = await Table.findOne({ name: joinField.reftable_name });
-  const schema = db.getTenantSchema();
   const joinedRow = await joinedTable.getRow({ [valField]: value });
   await joinTable.insertRow({ [relField]: id, [joinFieldNm]: joinedRow.id });
   return { json: { success: "ok" } };
