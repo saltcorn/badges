@@ -1,4 +1,4 @@
-const { span, button, i, a } = require("@saltcorn/markup/tags");
+const { span, button, i, a, script } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
 const Table = require("@saltcorn/data/models/table");
@@ -88,13 +88,14 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
       "EditBadges view incorrectly configured. No relation chosen"
     );
   }
-
+  const rndid = `bs${Math.round(Math.random() * 100000)}`;
   const [relTableNm, relField, joinFieldNm, valField] = relSplit;
   const table = await Table.findOne({ id: table_id });
 
   const relTable = await Table.findOne({ name: relTableNm });
   await relTable.getFields();
   const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
+  const joinedTable = await Table.findOne({ name: joinField.reftable_name });
 
   const rows = await table.getJoinedRows({
     where: { id },
@@ -112,21 +113,47 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
       },
     },
   });
-  return (rows[0]._badges || [])
-    .map((b) =>
-      span(
-        { class: "badge badge-secondary" },
-        b,
-        a(
-          {
-            onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
-          },
-          i({ class: "ml-1 fas fa-lg fa-times" })
-        )
-      )
+
+  const existing = (rows[0]._badges || [])
+    .map(
+      (b) =>
+        span(
+          { class: "badge badge-secondary" },
+          b,
+          a(
+            {
+              onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
+            },
+            i({ class: "ml-1 fas fa-lg fa-times" })
+          )
+        ) + "&nbsp;"
     )
-    .join("&nbsp;");
+    .join("");
+
+  const possibles = await joinedTable.distinctValues(valField);
+  const addbadge =
+    span(
+      {
+        class: "badge badge-secondary",
+        id: rndid,
+        onclick: `add_badge_${rndid}('${rndid}', ${id})`,
+      },
+      i({ class: "fas fa-lg fa-plus" })
+    ) +
+    script(`function add_badge_${rndid}(divid, dbid){
+      $('#'+divid).replaceWith(\`<select style="width:100px"class="form-control-sm" onchange="set_add_badge_${rndid}(this)">
+        <option selected>Choose...</option>
+        ${possibles.map((p) => `<option>${p}</option>`).join("")}       
+      </select>
+     \`)
+  }
+  function set_add_badge_${rndid}(that) {
+    view_post('${viewname}', 'add', {id:'${id}', value: that.value}, function(){location.reload();})
+  }
+  `);
+  return existing + addbadge;
 };
+
 const remove = async (table_id, viewname, { relation }, { id, value }) => {
   const relSplit = relation.split(".");
   const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
@@ -136,14 +163,25 @@ const remove = async (table_id, viewname, { relation }, { id, value }) => {
   const schema = db.getTenantSchema();
   await db.query(
     `delete from "${schema}"."${db.sqlsanitize(joinTable.name)}" 
-        where "${db.sqlsanitize(relField)}"=$1 and 
-        "${db.sqlsanitize(joinFieldNm)}" in 
-        (select id from "${schema}"."${db.sqlsanitize(
-      joinField.reftable_name
-    )}" 
-                where "${db.sqlsanitize(valField)}"=$2)`,
+      where "${db.sqlsanitize(relField)}"=$1 and 
+      "${db.sqlsanitize(joinFieldNm)}" in 
+      (select id from 
+        "${schema}"."${db.sqlsanitize(joinField.reftable_name)}" 
+        where "${db.sqlsanitize(valField)}"=$2)`,
     [id, value]
   );
+  return { json: { success: "ok" } };
+};
+const add = async (table_id, viewname, { relation }, { id, value }) => {
+  const relSplit = relation.split(".");
+  const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
+  const joinTable = await Table.findOne({ name: joinTableNm });
+  await joinTable.getFields();
+  const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
+  const joinedTable = await Table.findOne({ name: joinField.reftable_name });
+  const schema = db.getTenantSchema();
+  const joinedRow = await joinedTable.getRow({ [valField]: value });
+  await joinTable.insertRow({ [relField]: id, [joinFieldNm]: joinedRow.id });
   return { json: { success: "ok" } };
 };
 
@@ -153,5 +191,5 @@ module.exports = {
   get_state_fields,
   configuration_workflow,
   run,
-  routes: { remove },
+  routes: { remove, add },
 };
