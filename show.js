@@ -122,7 +122,7 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
         },
       },
     });
-    return rows[0]._badges
+    return (rows[0]._badges || [])
       .map((b) => span({ class: "badge badge-secondary" }, b))
       .join("&nbsp;");
   }

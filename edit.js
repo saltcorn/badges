@@ -112,12 +112,11 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
       },
     },
   });
-  return rows[0]._badges
+  return (rows[0]._badges || [])
     .map((b) =>
       span(
         { class: "badge badge-secondary" },
         b,
-
         a(
           {
             onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
@@ -128,7 +127,23 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
     )
     .join("&nbsp;");
 };
-const remove = async (table_id, viewname, { relation }, body) => {
+const remove = async (table_id, viewname, { relation }, { id, value }) => {
+  const relSplit = relation.split(".");
+  const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
+  const joinTable = await Table.findOne({ name: joinTableNm });
+  await joinTable.getFields();
+  const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
+  const schema = db.getTenantSchema();
+  await db.query(
+    `delete from "${schema}"."${db.sqlsanitize(joinTable.name)}" 
+        where "${db.sqlsanitize(relField)}"=$1 and 
+        "${db.sqlsanitize(joinFieldNm)}" in 
+        (select id from "${schema}"."${db.sqlsanitize(
+      joinField.reftable_name
+    )}" 
+                where "${db.sqlsanitize(valField)}"=$2)`,
+    [id, value]
+  );
   return { json: { success: "ok" } };
 };
 
