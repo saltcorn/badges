@@ -118,15 +118,25 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
         { class: "badge badge-secondary" },
         b,
 
-        a({ onclick: "" }, i({ class: "ml-1 fas fa-lg fa-times" }))
+        a(
+          {
+            onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
+          },
+          i({ class: "ml-1 fas fa-lg fa-times" })
+        )
       )
     )
     .join("&nbsp;");
 };
+const remove = async (table_id, viewname, { relation }, body) => {
+  return { json: { success: "ok" } };
+};
+
 module.exports = {
   name: "EditBadges",
   display_state_form: false,
   get_state_fields,
   configuration_workflow,
   run,
+  routes: { remove },
 };
