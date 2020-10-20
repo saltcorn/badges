@@ -181,7 +181,7 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
       },
     });
     return rows.map((row) => ({
-      html: row._badges
+      html: (row._badges || [])
         .map((b) => span({ class: "badge badge-secondary" }, b))
         .join("&nbsp;"),
       row,
