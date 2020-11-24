@@ -1,4 +1,4 @@
-const { span } = require("@saltcorn/markup/tags");
+const { span, p, code } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
 const Table = require("@saltcorn/data/models/table");
@@ -14,7 +14,7 @@ const configuration_workflow = () =>
   new Workflow({
     steps: [
       {
-        name: "views",
+        name: "Badge relation",
         form: async (context) => {
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
@@ -55,10 +55,13 @@ const configuration_workflow = () =>
             }
           }
           return new Form({
+            blurb: "Choose the relation that defines the content of the badges",
             fields: [
               {
                 name: "relation",
                 label: "Relation",
+                sublabel:
+                  "Choose a <ul><li>one-to-many relation (Table.foreignKey&#8594;badgeLabel) or a </li><li>many-to-many relation (JoinTable.foreignKey&#8594;keyToTableWithLabels&#8594;badgeLabel) </li> </ul>",
                 type: "String",
                 required: true,
                 attributes: {

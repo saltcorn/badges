@@ -14,7 +14,7 @@ const configuration_workflow = () =>
   new Workflow({
     steps: [
       {
-        name: "views",
+        name: "Badge relation",
         form: async (context) => {
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
@@ -55,11 +55,15 @@ const configuration_workflow = () =>
             }
           }
           return new Form({
+            blurb: "Choose the relation that defines the content of the badges",
             fields: [
               {
                 name: "relation",
                 label: "Relation",
                 type: "String",
+                sublabel:
+                  "Only many-to-many relations (JoinTable.foreignKey&#8594;keyToTableWithLabels&#8594;badgeLabel) are supported ",
+
                 required: true,
                 attributes: {
                   options: agg_field_opts,
