@@ -47,10 +47,11 @@ const configuration_workflow = () =>
               if (!joined_table) continue;
               await joined_table.getFields();
               joined_table.fields.forEach((jf) => {
-                agg_field_opts.push({
-                  label: `${table.name}.${key_field.name}&#8594;${kf.name}&#8594;${jf.name}`,
-                  name: `${table.name}.${key_field.name}.${kf.name}.${jf.name}`,
-                });
+                if (jf.name !== kf.name)
+                  agg_field_opts.push({
+                    label: `${table.name}.${key_field.name}&#8594;${kf.name}&#8594;${jf.name}`,
+                    name: `${table.name}.${key_field.name}.${kf.name}.${jf.name}`,
+                  });
               });
             }
           }
