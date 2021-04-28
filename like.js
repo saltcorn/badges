@@ -115,7 +115,7 @@ const run = async (
   }
   const likerow = await relTable.getRow(where);
 
-  const handler = `(function(that){$(that).hasClass('text-danger')?view_post('${viewname}', 'remove', {id:'${id}'}, function(){$(that).removeClass('text-danger').html('<i class=\\'far fa-lg fa-heart\\'></i>')} ):view_post('${viewname}', 'like', {id:'${id}'}, function(){$(that).addClass('text-danger').html('<i class=\\'fas fa-lg fa-heart\\'></i>')} )})(this)`;
+  const handler = `$(this).hasClass('text-danger')?view_post('${viewname}', 'remove', {id:'${id}'}, ()=>{$(this).removeClass('text-danger').html('<i class=\\'far fa-lg fa-heart\\'></i>')} ):view_post('${viewname}', 'like', {id:'${id}'}, ()=>{$(this).addClass('text-danger').html('<i class=\\'fas fa-lg fa-heart\\'></i>')} )`;
 
   if (likerow) {
     return span(
