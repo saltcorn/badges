@@ -118,22 +118,28 @@ const run = async (
   if (likerow) {
     return span(
       {
-        style: "color:#e25",
-        onclick: `view_post('${viewname}', 'remove', {id:'${id}'})`,
+        class: "text-danger",
+        onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}'}, function(){$(that).removeClass('text-danger').html('<i class=\\'far fa-heart\\'></i>')} )})(this)`,
       },
       i({ class: "fas fa-heart" })
     );
   } else {
     return span(
-      {        
-        onclick: `view_post('${viewname}', 'like', {id:'${id}'})`,
+      {
+        onclick: `(function(that){view_post('${viewname}', 'like', {id:'${id}'}, function(){$(that).addClass('text-danger').html('<i class=\\'fas fa-heart\\'></i>')} )})(this)`,
       },
       i({ class: "far fa-heart" })
     );
   }
 };
 
-const remove = async (table_id, viewname, {relation, user_field, session_field }, { id }, extra) => {
+const remove = async (
+  table_id,
+  viewname,
+  { relation, user_field, session_field },
+  { id },
+  extra
+) => {
   const [reltable, relfield] = relation.split(".");
   const relTable = await Table.findOne({ name: reltable });
 
@@ -143,11 +149,17 @@ const remove = async (table_id, viewname, {relation, user_field, session_field }
 
   if (user_id && user_field) where[user_field] = user_id;
   else if (session_field) where[session_field] = extra.req.sessionID;
-  await relTable.deleteRows(where)
+  await relTable.deleteRows(where);
 
   return { json: { success: "ok" } };
 };
-const like = async (table_id, viewname, { relation, user_field, session_field}, { id }, extra) => {
+const like = async (
+  table_id,
+  viewname,
+  { relation, user_field, session_field },
+  { id },
+  extra
+) => {
   const [reltable, relfield] = relation.split(".");
   const relTable = await Table.findOne({ name: reltable });
 
@@ -158,7 +170,7 @@ const like = async (table_id, viewname, { relation, user_field, session_field}, 
   if (user_id && user_field) where[user_field] = user_id;
   else if (session_field) where[session_field] = extra.req.sessionID;
 
-  await relTable.insertRow(where, user_id)
+  await relTable.insertRow(where, user_id);
 
   return { json: { success: "ok" } };
 };
