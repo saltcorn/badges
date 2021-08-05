@@ -86,10 +86,15 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
 const run = async (table_id, viewname, { relation }, state, extra) => {
   const { id } = state;
   if (!id) return "need id";
+  if (!relation) {
+    throw new Error(
+      `EditBadges view ${viewname} incorrectly configured. No relation chosen`
+    );
+  }
   const relSplit = relation.split(".");
   if (relSplit.length < 4) {
     throw new Error(
-      "EditBadges view incorrectly configured. No relation chosen"
+      `EditBadges view ${viewname} incorrectly configured. No relation chosen`
     );
   }
   const rndid = `bs${Math.round(Math.random() * 100000)}`;
