@@ -9,6 +9,8 @@ const {
   stateFieldsToWhere,
   picked_fields_to_query,
 } = require("@saltcorn/data/plugin-helper");
+const { features } = require("@saltcorn/data/db/state");
+const bs5 = features && features.bootstrap5;
 
 const configuration_workflow = () =>
   new Workflow({

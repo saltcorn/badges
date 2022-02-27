@@ -9,6 +9,8 @@ const {
   stateFieldsToWhere,
   picked_fields_to_query,
 } = require("@saltcorn/data/plugin-helper");
+const { features } = require("@saltcorn/data/db/state");
+const bs5 = features && features.bootstrap5;
 
 const configuration_workflow = () =>
   new Workflow({
@@ -127,7 +129,7 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
     .map(
       (b) =>
         span(
-          { class: "badge badge-secondary" },
+          { class: ["badge", bs5 ? "bg-secondary" : "badge-secondary"] },
           b,
           a(
             {
@@ -145,7 +147,11 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
       { class: "dropdown" },
       span(
         {
-          class: "badge badge-secondary dropdown-toggle",
+          class: [
+            "badge",
+            bs5 ? "bg-secondary" : "badge-secondary",
+            "dropdown-toggle",
+          ],
           "data-toggle": "dropdown",
           id: rndid,
           "aria-haspopup": "true",

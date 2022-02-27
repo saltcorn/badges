@@ -9,6 +9,8 @@ const {
   stateFieldsToWhere,
   picked_fields_to_query,
 } = require("@saltcorn/data/plugin-helper");
+const { features } = require("@saltcorn/data/db/state");
+const bs5 = features && features.bootstrap5;
 
 const configuration_workflow = () =>
   new Workflow({
@@ -105,7 +107,12 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
     });
 
     return rows
-      .map((row) => span({ class: "badge badge-secondary" }, row[valField]))
+      .map((row) =>
+        span(
+          { class: ["badge", bs5 ? "bg-secondary" : "badge-secondary"] },
+          row[valField]
+        )
+      )
       .join("&nbsp;");
   } else {
     const [relTableNm, relField, joinFieldNm, valField] = relSplit;
@@ -132,7 +139,9 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
       },
     });
     return (rows[0]._badges || [])
-      .map((b) => span({ class: "badge badge-secondary" }, b))
+      .map((b) =>
+        span({ class: ["badge", bs5 ? "bg-secondary" : "badge-secondary"] }, b)
+      )
       .join("&nbsp;");
   }
 };
@@ -167,7 +176,12 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
 
     return rows.map((row) => ({
       html: row._badges
-        .map((b) => span({ class: "badge badge-secondary" }, b))
+        .map((b) =>
+          span(
+            { class: ["badge", bs5 ? "bg-secondary" : "badge-secondary"] },
+            b
+          )
+        )
         .join("&nbsp;"),
       row,
     }));
@@ -196,7 +210,12 @@ const runMany = async (table_id, viewname, { relation }, state, extra) => {
     });
     return rows.map((row) => ({
       html: (row._badges || [])
-        .map((b) => span({ class: "badge badge-secondary" }, b))
+        .map((b) =>
+          span(
+            { class: ["badge", bs5 ? "bg-secondary" : "badge-secondary"] },
+            b
+          )
+        )
         .join("&nbsp;"),
       row,
     }));
