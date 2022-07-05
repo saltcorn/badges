@@ -21,10 +21,8 @@ const configuration_workflow = () =>
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
           const fields = await table.getFields();
-          const {
-            child_field_list,
-            child_relations,
-          } = await table.get_child_relations();
+          const { child_field_list, child_relations } =
+            await table.get_child_relations();
           var agg_field_opts = [];
           child_relations.forEach(({ table, key_field }) => {
             table.fields
@@ -40,7 +38,7 @@ const configuration_workflow = () =>
             const keyFields = table.fields.filter(
               (f) =>
                 f.type === "Key" &&
-                ![mytable.name, "users", "_sc_files"].includes(f.reftable_name)
+                ![mytable.name, "_sc_files"].includes(f.reftable_name)
             );
             for (const kf of keyFields) {
               const joined_table = await Table.findOne({
