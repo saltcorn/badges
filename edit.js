@@ -21,10 +21,8 @@ const configuration_workflow = () =>
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
           const fields = await table.getFields();
-          const {
-            child_field_list,
-            child_relations,
-          } = await table.get_child_relations();
+          const { child_field_list, child_relations } =
+            await table.get_child_relations();
           var agg_field_opts = [];
           /* child_relations.forEach(({ table, key_field }) => {
             table.fields
@@ -135,7 +133,7 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
             {
               onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
             },
-            i({ class: "ml-1 fas fa-lg fa-times" })
+            i({ class: "ms-1 fas fa-lg fa-times" })
           )
         ) + "&nbsp;"
     )
@@ -152,7 +150,7 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
             bs5 ? "bg-secondary" : "badge-secondary",
             "dropdown-toggle",
           ],
-          "data-toggle": "dropdown",
+          "data-bs-toggle": "dropdown",
           id: rndid,
           "aria-haspopup": "true",
           "aria-expanded": "false",
