@@ -69,6 +69,22 @@ const configuration_workflow = () =>
                   options: agg_field_opts,
                 },
               },
+              {
+                name: "size",
+                type: "String",
+                sublabel: "Match size to a header style",
+                attributes: {
+                  options: [1, 2, 3, 4, 5, 6].map((n) => ({
+                    name: `fs-${n}`,
+                    label: `Heading ${n}`,
+                  })),
+                },
+              },
+              {
+                name: "rounded_pill",
+                type: "Bool",
+                label: "Rounded pill appearance",
+              },
             ],
           });
         },
@@ -83,7 +99,13 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
   },
 ];
 
-const run = async (table_id, viewname, { relation }, state, extra) => {
+const run = async (
+  table_id,
+  viewname,
+  { relation, size, rounded_pill },
+  state,
+  extra
+) => {
   const { id } = state;
   if (!id) return "need id";
   if (!relation) {
@@ -127,7 +149,14 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
     .map(
       (b) =>
         span(
-          { class: ["badge", bs5 ? "bg-secondary" : "badge-secondary"] },
+          {
+            class: [
+              "badge",
+              bs5 ? "bg-secondary" : "badge-secondary",
+              size,
+              rounded_pill && "rounded-pill",
+            ],
+          },
           b,
           a(
             {
@@ -149,6 +178,8 @@ const run = async (table_id, viewname, { relation }, state, extra) => {
             "badge",
             bs5 ? "bg-secondary" : "badge-secondary",
             "dropdown-toggle",
+            size,
+            rounded_pill && "rounded-pill",
           ],
           "data-bs-toggle": "dropdown",
           id: rndid,
