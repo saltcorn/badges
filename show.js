@@ -38,7 +38,7 @@ const configuration_workflow = () =>
             const keyFields = table.fields.filter(
               (f) =>
                 f.type === "Key" &&
-                ![mytable.name, "_sc_files"].includes(f.reftable_name)
+                !["_sc_files"].includes(f.reftable_name)
             );
             for (const kf of keyFields) {
               const joined_table = await Table.findOne({
