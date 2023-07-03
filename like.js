@@ -20,7 +20,7 @@ const configuration_workflow = () =>
         form: async (context) => {
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
-          const fields = await table.getFields();
+          const fields = table.getFields();
           const {
             child_field_list,
             child_relations,
@@ -37,7 +37,7 @@ const configuration_workflow = () =>
             table_opts.push(relnm);
             user_field_opts[relnm] = [""];
             session_field_opts[relnm] = [""];
-            await table.getFields();
+            table.getFields();
             table.fields.forEach((f) => {
               if (f.type.name === "String")
                 session_field_opts[relnm].push(f.name);
@@ -79,6 +79,12 @@ const configuration_workflow = () =>
                   calcOptions: ["relation", session_field_opts],
                 },
               },
+              {
+                name: "min_role_id",
+                type: "Integer",
+                label: "Role id to access view",
+                default: 100,
+              },
             ],
           });
         },
@@ -96,11 +102,12 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
 const run = async (
   table_id,
   viewname,
-  { relation, user_field, session_field },
+  { relation, user_field, session_field, min_role_id },
   state,
   extra
 ) => {
   const { id } = state;
+  if (extra.req.user.role_id > min_role_id) return "";
   if (!id) return "need id";
 
   const [reltable, relfield] = relation.split(".");
