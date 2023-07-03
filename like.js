@@ -107,7 +107,8 @@ const run = async (
   extra
 ) => {
   const { id } = state;
-  if (extra.req.user.role_id > min_role_id) return "";
+  const role_id = extra.req.user?.role_id || 100;
+  if (role_id > min_role_id) return "";
   if (!id) return "need id";
 
   const [reltable, relfield] = relation.split(".");
