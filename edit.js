@@ -37,8 +37,7 @@ const configuration_workflow = () =>
           for (const { table, key_field } of child_relations) {
             const keyFields = table.fields.filter(
               (f) =>
-                f.type === "Key" &&
-                !["_sc_files"].includes(f.reftable_name)
+                f.type === "Key" && !["_sc_files"].includes(f.reftable_name)
             );
             for (const kf of keyFields) {
               const joined_table = await Table.findOne({
@@ -99,6 +98,27 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
   },
 ];
 
+const render1 =
+  ({ size, rounded_pill, viewname, id }) =>
+  (b) =>
+    span(
+      {
+        class: [
+          "badge",
+          bs5 ? "bg-secondary" : "badge-secondary",
+          size,
+          rounded_pill && "rounded-pill",
+        ],
+      },
+      b,
+      a(
+        {
+          onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
+        },
+        i({ class: "ms-1 fas fa-lg fa-times" })
+      )
+    ) + "&nbsp;";
+
 const run = async (
   table_id,
   viewname,
@@ -146,32 +166,13 @@ const run = async (
   });
 
   const existing = (rows[0]._badges || [])
-    .map(
-      (b) =>
-        span(
-          {
-            class: [
-              "badge",
-              bs5 ? "bg-secondary" : "badge-secondary",
-              size,
-              rounded_pill && "rounded-pill",
-            ],
-          },
-          b,
-          a(
-            {
-              onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
-            },
-            i({ class: "ms-1 fas fa-lg fa-times" })
-          )
-        ) + "&nbsp;"
-    )
+    .map(render1({ size, rounded_pill, viewname, id }))
     .join("");
 
   const possibles = await joinedTable.distinctValues(valField);
   const addbadge =
     span(
-      { class: "dropdown" },
+      { class: "dropdown", id: `dd${rndid}` },
       span(
         {
           class: [
@@ -204,7 +205,9 @@ const run = async (
       )
     ) +
     script(`function set_add_badge_${rndid}(value) {
-    view_post('${viewname}', 'add', {id:'${id}', value: value}, function(){location.reload();})
+    view_post('${viewname}', 'add', {id:'${id}', value: value}, function(resp){
+      $('span#dd${rndid}').before(resp.new_badge)
+    })
   }
   `);
   return existing + addbadge;
@@ -228,7 +231,12 @@ const remove = async (table_id, viewname, { relation }, { id, value }) => {
   );
   return { json: { success: "ok" } };
 };
-const add = async (table_id, viewname, { relation }, { id, value }) => {
+const add = async (
+  table_id,
+  viewname,
+  { relation, size, rounded_pill },
+  { id, value }
+) => {
   const relSplit = relation.split(".");
   const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
   const joinTable = await Table.findOne({ name: joinTableNm });
@@ -237,7 +245,12 @@ const add = async (table_id, viewname, { relation }, { id, value }) => {
   const joinedTable = await Table.findOne({ name: joinField.reftable_name });
   const joinedRow = await joinedTable.getRow({ [valField]: value });
   await joinTable.insertRow({ [relField]: id, [joinFieldNm]: joinedRow.id });
-  return { json: { success: "ok" } };
+  return {
+    json: {
+      success: "ok",
+      new_badge: render1({ viewname, size, rounded_pill, id })(value),
+    },
+  };
 };
 
 module.exports = {
