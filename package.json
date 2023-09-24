@@ -1,6 +1,6 @@
 {
   "name": "@saltcorn/badges",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Display badges from relationships",
   "main": "index.js",
   "dependencies": {
@@ -18,5 +18,21 @@
   },
   "scripts": {
     "test": "jest"
+  },
+  "eslintConfig": {
+    "extends": "eslint:recommended",
+    "parserOptions": {
+      "ecmaVersion": 2020
+    },
+    "env": {
+      "node": true,
+      "es6": true
+    },
+    "rules": {
+      "no-unused-vars": "off",
+      "no-case-declarations": "off",
+      "no-empty": "warn",
+      "no-fallthrough": "warn"
+    }
   }
 }
