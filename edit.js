@@ -20,10 +20,10 @@ const configuration_workflow = () =>
         form: async (context) => {
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
-          const fields = await table.getFields();
+          const fields = table.getFields();
           const { child_field_list, child_relations } =
             await table.get_child_relations();
-          var agg_field_opts = [];
+          let agg_field_opts = [];
           /* child_relations.forEach(({ table, key_field }) => {
             table.fields
               .filter((f) => !f.calculated || f.stored)
@@ -44,7 +44,7 @@ const configuration_workflow = () =>
                 name: kf.reftable_name,
               });
               if (!joined_table) continue;
-              await joined_table.getFields();
+              joined_table.getFields();
               joined_table.fields.forEach((jf) => {
                 agg_field_opts.push({
                   label: `${table.name}.${key_field.name}&#8594;${kf.name}&#8594;${jf.name}`,
@@ -84,6 +84,12 @@ const configuration_workflow = () =>
                 type: "Bool",
                 label: "Rounded pill appearance",
               },
+              {
+                name: "min_role_id",
+                type: "Integer",
+                label: "Role id to access view",
+                default: 100,
+              },
             ],
           });
         },
@@ -122,11 +128,13 @@ const render1 =
 const run = async (
   table_id,
   viewname,
-  { relation, size, rounded_pill },
+  { relation, size, rounded_pill, min_role_id },
   state,
   extra
 ) => {
   const { id } = state;
+  const role_id = extra.req.user?.role_id || 100;
+  if (role_id > min_role_id) return "";
   if (!id) return "need id";
   if (!relation) {
     throw new Error(
