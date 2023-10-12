@@ -200,7 +200,7 @@ const run = async (
     ddWhere = jsexprToWhere(
       where,
       { ...rows[0], user: req.user },
-      table.fields
+      joinedTable.fields
     );
   const possibles = await joinedTable.distinctValues(valField, ddWhere);
   const addbadge =
