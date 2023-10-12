@@ -6,6 +6,10 @@ const Form = require("@saltcorn/data/models/form");
 const Field = require("@saltcorn/data/models/field");
 const db = require("@saltcorn/data/db");
 const {
+  jsexprToWhere,
+  eval_expression,
+} = require("@saltcorn/data/models/expression");
+const {
   stateFieldsToWhere,
   picked_fields_to_query,
 } = require("@saltcorn/data/plugin-helper");
@@ -84,6 +88,23 @@ const configuration_workflow = () =>
                 type: "Bool",
                 label: "Rounded pill appearance",
               },
+
+              {
+                name: "where",
+                label: "Where",
+                type: "String",
+                sublabel:
+                  "Restrict choices in dropdown; expression on table with labels.",
+              },
+              {
+                name: "field_values_formula",
+                label: "Row values formula",
+                //class: "validate-expression",
+                sublabel:
+                  "Optional. A formula for field values set when creating a new join table row. For example <code>{name: manager}</code>",
+                type: "String",
+                //fieldview: "textarea",
+              },
             ],
           });
         },
@@ -122,11 +143,12 @@ const render1 =
 const run = async (
   table_id,
   viewname,
-  { relation, size, rounded_pill },
+  { relation, size, rounded_pill, where },
   state,
   extra
 ) => {
   const { id } = state;
+  const req = extra.req;
   if (!id) return "need id";
   if (!relation) {
     throw new Error(
@@ -150,6 +172,8 @@ const run = async (
 
   const rows = await table.getJoinedRows({
     where: { id },
+    forPublic: !req.user || req.user.role_id === 100, // TODO in mobile set user null for public
+    forUser: req.user,
     aggregations: {
       _badges: {
         table: joinField.reftable_name,
@@ -165,11 +189,20 @@ const run = async (
     },
   });
 
+  if (!rows[0]) return "No row selected";
+
   const existing = (rows[0]._badges || [])
     .map(render1({ size, rounded_pill, viewname, id }))
     .join("");
 
-  const possibles = await joinedTable.distinctValues(valField);
+  let ddWhere = {};
+  if (where)
+    ddWhere = jsexprToWhere(
+      where,
+      { ...rows[0], user: req.user },
+      table.fields
+    );
+  const possibles = await joinedTable.distinctValues(valField, ddWhere);
   const addbadge =
     span(
       { class: "dropdown", id: `dd${rndid}` },
@@ -234,9 +267,22 @@ const remove = async (table_id, viewname, { relation }, { id, value }) => {
 const add = async (
   table_id,
   viewname,
-  { relation, size, rounded_pill },
-  { id, value }
+  { relation, size, rounded_pill, field_values_formula },
+  { id, value },
+  { req }
 ) => {
+  const table = await Table.findOne({ id: table_id });
+  const rows = await table.getJoinedRows({
+    where: { id },
+    forPublic: !req.user || req.user.role_id === 100, // TODO in mobile set user null for public
+    forUser: req.user,
+  });
+  if (!rows[0]) return { json: { error: "Row not found" } };
+  let extra = {};
+  if (field_values_formula) {
+    extra = eval_expression(field_values_formula, rows[0], req.user);
+  }
+
   const relSplit = relation.split(".");
   const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
   const joinTable = await Table.findOne({ name: joinTableNm });
@@ -244,7 +290,11 @@ const add = async (
   const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
   const joinedTable = await Table.findOne({ name: joinField.reftable_name });
   const joinedRow = await joinedTable.getRow({ [valField]: value });
-  await joinTable.insertRow({ [relField]: id, [joinFieldNm]: joinedRow.id });
+  await joinTable.insertRow({
+    [relField]: id,
+    [joinFieldNm]: joinedRow.id,
+    ...extra,
+  });
   return {
     json: {
       success: "ok",
@@ -258,6 +308,7 @@ module.exports = {
   display_state_form: false,
   get_state_fields,
   configuration_workflow,
+  description: "Edit many-to-many relationships with badges",
   run,
   routes: { remove, add },
 };

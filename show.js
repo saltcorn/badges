@@ -37,8 +37,7 @@ const configuration_workflow = () =>
           for (const { table, key_field } of child_relations) {
             const keyFields = table.fields.filter(
               (f) =>
-                f.type === "Key" &&
-                !["_sc_files"].includes(f.reftable_name)
+                f.type === "Key" && !["_sc_files"].includes(f.reftable_name)
             );
             for (const kf of keyFields) {
               const joined_table = await Table.findOne({
@@ -283,6 +282,8 @@ module.exports = {
   display_state_form: false,
   get_state_fields,
   configuration_workflow,
+  description: "Show many-to-many relationships with badges",
+
   run,
   runMany,
 };
