@@ -203,6 +203,9 @@ const run = async (
       joinedTable.fields
     );
   const possibles = await joinedTable.distinctValues(valField, ddWhere);
+  possibles.sort((a, b) =>
+    (a?.toLowerCase?.() || a) > (b?.toLowerCase?.() || b) ? 1 : -1
+  );
   const addbadge =
     span(
       { class: "dropdown", id: `dd${rndid}` },
