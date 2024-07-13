@@ -145,67 +145,30 @@ const run = async (
   viewname,
   { relation, size, rounded_pill, where },
   state,
-  extra
+  extra,
+  queriesObj
 ) => {
   const { id } = state;
-  const req = extra.req;
   if (!id) return "need id";
-  if (!relation) {
-    throw new Error(
-      `EditBadges view ${viewname} incorrectly configured. No relation chosen`
-    );
-  }
-  const relSplit = relation.split(".");
-  if (relSplit.length < 4) {
-    throw new Error(
-      `EditBadges view ${viewname} incorrectly configured. No relation chosen`
-    );
-  }
-  const rndid = `bs${Math.round(Math.random() * 100000)}`;
-  const [relTableNm, relField, joinFieldNm, valField] = relSplit;
-  const table = await Table.findOne({ id: table_id });
 
-  const relTable = await Table.findOne({ name: relTableNm });
-  await relTable.getFields();
-  const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
-  const joinedTable = await Table.findOne({ name: joinField.reftable_name });
-
-  const rows = await table.getJoinedRows({
-    where: { id },
-    forPublic: !req.user || req.user.role_id === 100, // TODO in mobile set user null for public
-    forUser: req.user,
-    aggregations: {
-      _badges: {
-        table: joinField.reftable_name,
-        ref: "id",
-        subselect: {
-          field: joinFieldNm,
-          table: relTable,
-          whereField: relField,
+  const { existing, possibles, error, html } = queriesObj?.edit_query
+    ? await queriesObj.edit_query(id)
+    : await editQueryImpl(
+        id,
+        table_id,
+        viewname,
+        {
+          relation,
+          size,
+          rounded_pill,
+          where,
         },
-        field: valField,
-        aggregate: "ARRAY_AGG",
-      },
-    },
-  });
+        extra.req
+      );
+  if (error) throw new Error(error);
+  else if (html) return html;
 
-  if (!rows[0]) return "No row selected";
-
-  const existing = (rows[0]._badges || [])
-    .map(render1({ size, rounded_pill, viewname, id }))
-    .join("");
-
-  let ddWhere = {};
-  if (where)
-    ddWhere = jsexprToWhere(
-      where,
-      { ...rows[0], user: req.user },
-      joinedTable.fields
-    );
-  const possibles = await joinedTable.distinctValues(valField, ddWhere);
-  possibles.sort((a, b) =>
-    (a?.toLowerCase?.() || a) > (b?.toLowerCase?.() || b) ? 1 : -1
-  );
+  const rndid = `bs${Math.round(Math.random() * 100000)}`;
   const addbadge =
     span(
       { class: "dropdown", id: `dd${rndid}` },
@@ -249,38 +212,143 @@ const run = async (
   return existing + addbadge;
 };
 
-const remove = async (table_id, viewname, { relation }, { id, value }) => {
-  const relSplit = relation.split(".");
-  const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
-  const joinTable = await Table.findOne({ name: joinTableNm });
-  await joinTable.getFields();
-  const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
-  const schema = db.getTenantSchema();
-  await db.query(
-    `delete from "${schema}"."${db.sqlsanitize(joinTable.name)}" 
-      where "${db.sqlsanitize(relField)}"=$1 and 
-      "${db.sqlsanitize(joinFieldNm)}" in 
-      (select id from 
-        "${schema}"."${db.sqlsanitize(joinField.reftable_name)}" 
-        where "${db.sqlsanitize(valField)}"=$2)`,
-    [id, value]
-  );
-  return { json: { success: "ok" } };
+const remove = async (
+  table_id,
+  viewname,
+  { relation },
+  { id, value },
+  extra,
+  queriesObj
+) => {
+  const queryRes = queriesObj?.remove_route_query
+    ? await queriesObj.remove_route_query(id, value)
+    : await removeRouteImpl(table_id, viewname, { relation }, { id, value });
+  return { json: queryRes };
 };
 const add = async (
   table_id,
   viewname,
   { relation, size, rounded_pill, field_values_formula },
   { id, value },
-  { req }
+  { req },
+  queriesObj
 ) => {
-  const table = await Table.findOne({ id: table_id });
+  const queryRes = queriesObj?.add_route_query
+    ? await queriesObj.add_route_query(id, value)
+    : await addRouteImpl(
+        table_id,
+        { id, value },
+        { relation, size, rounded_pill, field_values_formula },
+        req
+      );
+  if (queryRes.error) return { json: { error: queryRes.error } };
+  else
+    return {
+      json: {
+        success: "ok",
+        new_badge: render1({ viewname, size, rounded_pill, id })(value),
+      },
+    };
+};
+
+const editQueryImpl = async (
+  id,
+  table_id,
+  viewname,
+  { relation, size, rounded_pill, where },
+  req
+) => {
+  if (!relation) {
+    return {
+      error: `EditBadges view ${viewname} incorrectly configured. No relation chosen`,
+    };
+  }
+  const relSplit = relation.split(".");
+  if (relSplit.length < 4) {
+    return {
+      error: `EditBadges view ${viewname} incorrectly configured. No relation chosen`,
+    };
+  }
+  const [relTableNm, relField, joinFieldNm, valField] = relSplit;
+  const table = Table.findOne({ id: table_id });
+
+  const relTable = Table.findOne({ name: relTableNm });
+  await relTable.getFields();
+  const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
+  const joinedTable = Table.findOne({ name: joinField.reftable_name });
+
+  const rows = await table.getJoinedRows({
+    where: { id },
+    forPublic: !req.user || req.user.role_id === 100, // TODO in mobile set user null for public
+    forUser: req.user,
+    aggregations: {
+      _badges: {
+        table: joinField.reftable_name,
+        ref: "id",
+        subselect: {
+          field: joinFieldNm,
+          table: relTable,
+          whereField: relField,
+        },
+        field: valField,
+        aggregate: "ARRAY_AGG",
+      },
+    },
+  });
+
+  if (!rows[0]) return { html: "No row selected" };
+
+  const existing = (rows[0]._badges || [])
+    .map(render1({ size, rounded_pill, viewname, id }))
+    .join("");
+
+  let ddWhere = {};
+  if (where)
+    ddWhere = jsexprToWhere(
+      where,
+      { ...rows[0], user: req.user },
+      joinedTable.fields
+    );
+  const possibles = await joinedTable.distinctValues(valField, ddWhere);
+  possibles.sort((a, b) =>
+    (a?.toLowerCase?.() || a) > (b?.toLowerCase?.() || b) ? 1 : -1
+  );
+
+  return { existing, possibles };
+};
+
+const removeRouteImpl = async (id, value, { relation }) => {
+  const relSplit = relation.split(".");
+  const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
+  const joinTable = Table.findOne({ name: joinTableNm });
+  await joinTable.getFields();
+  const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
+  const schema = db.getTenantSchema();
+  await db.query(
+    `delete from "${schema}"."${db.sqlsanitize(joinTable.name)}" 
+    where "${db.sqlsanitize(relField)}"=$1 and 
+    "${db.sqlsanitize(joinFieldNm)}" in 
+    (select id from 
+      "${schema}"."${db.sqlsanitize(joinField.reftable_name)}" 
+      where "${db.sqlsanitize(valField)}"=$2)`,
+    [id, value]
+  );
+  return { success: "ok" };
+};
+
+const addRouteImpl = async (
+  table_id,
+  { id, value },
+  { relation, field_values_formula },
+  req
+) => {
+  const table = Table.findOne({ id: table_id });
   const rows = await table.getJoinedRows({
     where: { id },
     forPublic: !req.user || req.user.role_id === 100, // TODO in mobile set user null for public
     forUser: req.user,
   });
-  if (!rows[0]) return { json: { error: "Row not found" } };
+  if (!rows[0]) return { error: "Row not found" };
   let extra = {};
   if (field_values_formula) {
     extra = eval_expression(field_values_formula, rows[0], req.user);
@@ -288,24 +356,18 @@ const add = async (
 
   const relSplit = relation.split(".");
   const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
-  const joinTable = await Table.findOne({ name: joinTableNm });
+  const joinTable = Table.findOne({ name: joinTableNm });
   await joinTable.getFields();
   const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
-  const joinedTable = await Table.findOne({ name: joinField.reftable_name });
+  const joinedTable = Table.findOne({ name: joinField.reftable_name });
   const joinedRow = await joinedTable.getRow({ [valField]: value });
   await joinTable.insertRow({
     [relField]: id,
     [joinFieldNm]: joinedRow.id,
     ...extra,
   });
-  return {
-    json: {
-      success: "ok",
-      new_badge: render1({ viewname, size, rounded_pill, id })(value),
-    },
-  };
+  return { success: "ok" };
 };
-
 module.exports = {
   name: "EditBadges",
   display_state_form: false,
@@ -314,4 +376,47 @@ module.exports = {
   description: "Edit many-to-many relationships with badges",
   run,
   routes: { remove, add },
+  queries: ({
+    table_id,
+    exttable_name,
+    name, // viewname
+    configuration: {
+      relation,
+      size,
+      rounded_pill,
+      where,
+      field_values_formula,
+    },
+    req,
+    res,
+  }) => ({
+    async edit_query(id) {
+      return await editQueryImpl(
+        id,
+        table_id,
+        name,
+        {
+          relation,
+          size,
+          rounded_pill,
+          where,
+        },
+        req
+      );
+    },
+    remove_route_query(id, value) {
+      return removeRouteImpl(id, value, { relation });
+    },
+    add_route_query(id, value) {
+      return addRouteImpl(
+        table_id,
+        {
+          id,
+          value,
+        },
+        { relation, field_values_formula },
+        req
+      );
+    },
+  }),
 };

@@ -21,10 +21,8 @@ const configuration_workflow = () =>
           const table = await Table.findOne({ id: context.table_id });
           const mytable = table;
           const fields = await table.getFields();
-          const {
-            child_field_list,
-            child_relations,
-          } = await table.get_child_relations();
+          const { child_field_list, child_relations } =
+            await table.get_child_relations();
 
           // table with like: parent user with user, no other required
           let table_opts = [];
@@ -98,28 +96,27 @@ const run = async (
   viewname,
   { relation, user_field, session_field },
   state,
-  extra
+  extra,
+  queriesObj
 ) => {
   const { id } = state;
   if (!id) return "need id";
-
-  const [reltable, relfield] = relation.split(".");
-  const relTable = await Table.findOne({ name: reltable });
-
-  // logged in?
-  const user_id = extra.req.user ? extra.req.user.id : null;
-  const where = { [relfield]: id };
-
-  if (user_id && user_field) where[user_field] = user_id;
-  else if (session_field) where[session_field] = extra.req.sessionID;
-  else {
-    return "";
-  }
-  const likerow = await relTable.getRow(where);
+  const likerow = queriesObj?.like_query
+    ? await queriesObj.like_query(id)
+    : await likeImpl(
+        id,
+        viewname,
+        {
+          relation,
+          user_field,
+          session_field,
+        },
+        extra.req
+      );
 
   const handler = `$(this).hasClass('text-danger')?view_post('${viewname}', 'remove', {id:'${id}'}, ()=>{$(this).removeClass('text-danger').html('<i class=\\'far fa-lg fa-heart\\'></i>')} ):view_post('${viewname}', 'like', {id:'${id}'}, ()=>{$(this).addClass('text-danger').html('<i class=\\'fas fa-lg fa-heart\\'></i>')} )`;
-
-  if (likerow) {
+  if (typeof likerow === "string") return likerow;
+  else if (likerow) {
     return span(
       {
         class: "text-danger",
@@ -142,19 +139,16 @@ const remove = async (
   viewname,
   { relation, user_field, session_field },
   { id },
-  extra
+  extra,
+  queriesObj
 ) => {
-  const [reltable, relfield] = relation.split(".");
-  const relTable = await Table.findOne({ name: reltable });
-
-  // logged in?
-  const user_id = extra.req.user ? extra.req.user.id : null;
-  const where = { [relfield]: +id };
-
-  if (user_id && user_field) where[user_field] = user_id;
-  else if (session_field) where[session_field] = extra.req.sessionID;
-  await relTable.deleteRows(where);
-
+  queriesObj?.remove_route_query
+    ? await queriesObj.remove_route_query(id)
+    : await removeRouteImpl(
+        id,
+        { relation, user_field, session_field },
+        extra.req
+      );
   return { json: { success: "ok" } };
 };
 const like = async (
@@ -162,21 +156,70 @@ const like = async (
   viewname,
   { relation, user_field, session_field },
   { id },
-  extra
+  extra,
+  queriesObj
+) => {
+  queriesObj?.like_route_query
+    ? await queriesObj.like_route_query(id)
+    : await likeRouteImpl(
+        id,
+        { relation, user_field, session_field },
+        extra.req
+      );
+  return { json: { success: "ok" } };
+};
+
+const likeImpl = async (
+  id,
+  viewname,
+  { relation, user_field, session_field },
+  req
 ) => {
   const [reltable, relfield] = relation.split(".");
-  const relTable = await Table.findOne({ name: reltable });
+  const relTable = Table.findOne({ name: reltable });
 
   // logged in?
-  const user_id = extra.req.user ? extra.req.user.id : null;
+  const user_id = req.user ? req.user.id : null;
+  const where = { [relfield]: id };
+
+  if (user_id && user_field) where[user_field] = user_id;
+  else if (session_field) where[session_field] = req.sessionID;
+  else return "";
+  return await relTable.getRow(where);
+};
+
+const removeRouteImpl = async (
+  id,
+  { relation, user_field, session_field },
+  req
+) => {
+  const [reltable, relfield] = relation.split(".");
+  const relTable = Table.findOne({ name: reltable });
+
+  // logged in?
+  const user_id = req.user ? req.user.id : null;
   const where = { [relfield]: +id };
 
   if (user_id && user_field) where[user_field] = user_id;
-  else if (session_field) where[session_field] = extra.req.sessionID;
+  else if (session_field) where[session_field] = req.sessionID;
+  await relTable.deleteRows(where);
+};
 
+const likeRouteImpl = async (
+  id,
+  { relation, user_field, session_field },
+  req
+) => {
+  const [reltable, relfield] = relation.split(".");
+  const relTable = Table.findOne({ name: reltable });
+
+  // logged in?
+  const user_id = req.user ? req.user.id : null;
+  const where = { [relfield]: +id };
+
+  if (user_id && user_field) where[user_field] = user_id;
+  else if (session_field) where[session_field] = req.sessionID;
   await relTable.insertRow(where, user_id);
-
-  return { json: { success: "ok" } };
 };
 
 module.exports = {
@@ -186,4 +229,36 @@ module.exports = {
   configuration_workflow,
   run,
   routes: { remove, like },
+  queries: ({
+    name, // viewname
+    configuration: { relation, user_field, session_field },
+    req,
+  }) => ({
+    async like_query(id) {
+      return await likeImpl(
+        id,
+        name,
+        {
+          relation,
+          user_field,
+          session_field,
+        },
+        req
+      );
+    },
+    async remove_route_query(id) {
+      return await removeRouteImpl(
+        id,
+        { relation, user_field, session_field },
+        req
+      );
+    },
+    async like_route_query(id) {
+      return await likeRouteImpl(
+        id,
+        { relation, user_field, session_field },
+        req
+      );
+    },
+  }),
 };
