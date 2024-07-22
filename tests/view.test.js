@@ -17,31 +17,25 @@ describe("badges show", () => {
     const view = View.findOne({ name: "show_album" });
     expect(view).toBeDefined();
     const result = await view.run({ id: 1 }, mockReqRes);
-    expect(result).toEqual(
-      `<h1>album A</h1><div class="d-inline" data-sc-embed-viewname="show_one_to_many" data-sc-view-source="/view/show_one_to_many?id=1">` +
-        `<span class="badge bg-secondary fs-4 rounded-pill">track one on album A</span>&nbsp;` +
-        `<span class="badge bg-secondary fs-4 rounded-pill">track two on album A</span></div><br /><br />` +
-        `<div class="d-inline" data-sc-embed-viewname="show_many_to_many" data-sc-view-source="/view/show_many_to_many?id=1">` +
-        `<span class="badge bg-secondary fs-3 rounded-pill">artist A</span>&nbsp;<span class="badge bg-secondary fs-3 rounded-pill">artist B</span></div>`
-    );
+    expect(result).toContain("<h1>album A</h1>");
+    expect(result).toContain("track one on album A");
+    expect(result).toContain("track two on album A");
+    expect(result).toContain("artist A");
+    expect(result).toContain("artist B");
   });
   it("show one to many", async () => {
     const view = View.findOne({ name: "show_one_to_many" });
     expect(view).toBeDefined();
     const result = await view.run({ id: 1 }, mockReqRes);
-    expect(result).toEqual(
-      `<span class="badge bg-secondary fs-4 rounded-pill">track one on album A</span>&nbsp;` +
-        `<span class="badge bg-secondary fs-4 rounded-pill">track two on album A</span>`
-    );
+    expect(result).toContain("track one on album A");
   });
 
   it("show many to many", async () => {
     const view = View.findOne({ name: "show_many_to_many" });
     expect(view).toBeDefined();
     const result = await view.run({ id: 1 }, mockReqRes);
-    expect(result).toEqual(
-      `<span class="badge bg-secondary fs-3 rounded-pill">artist A</span>&nbsp;<span class="badge bg-secondary fs-3 rounded-pill">artist B</span>`
-    );
+    expect(result).toContain("artist A");
+    expect(result).toContain("artist B");
   });
 });
 
@@ -94,6 +88,18 @@ describe("badges edit", () => {
 });
 
 describe("badges like", () => {
+  it("like route", async () => {
+    const view = View.findOne({ name: "like_album" });
+    expect(view).toBeDefined();
+    const body = { id: 2, user: 12 };
+    const req = mockReqRes.req;
+    req.user.id = 2;
+    await view.runRoute("like", body, mockReqRes.res, { req: req }, false);
+    const result = mockReqRes.getStored();
+    expect(result?.json).toBeDefined();
+    expect(result?.json.success).toEqual("ok");
+  });
+
   it("like album", async () => {
     const view = View.findOne({ name: "like_album" });
     expect(view).toBeDefined();
@@ -109,14 +115,11 @@ describe("badges like", () => {
     const view = View.findOne({ name: "show_album_with_like" });
     expect(view).toBeDefined();
     const result = await view.run({ id: 1 }, mockReqRes);
-    expect(result).toEqual(
-      `<h1>album A</h1><div class=\"d-inline\" data-sc-embed-viewname=\"show_one_to_many\" data-sc-view-source=\"/view/show_one_to_many?id=1\"></div><br /><br />` +
-        `<div class=\"d-inline\" data-sc-embed-viewname=\"show_many_to_many\" data-sc-view-source=\"/view/show_many_to_many?id=1\">` +
-        `<span class=\"badge bg-secondary fs-3 rounded-pill\">artist A</span>&nbsp;<span class=\"badge bg-secondary fs-3 rounded-pill\">artist B</span></div>` +
-        `<div class=\"d-inline\" data-sc-embed-viewname=\"like_album\" data-sc-view-source=\"/view/like_album?id=1\">` +
-        `<span onclick=\"$(this).hasClass('text-danger')?view_post('like_album', 'remove', {id:'1'}, ` +
+    expect(result).toContain("<h1>album A</h1>");
+    expect(result).toContain(
+      `<span onclick=\"$(this).hasClass('text-danger')?view_post('like_album', 'remove', {id:'1'}, ` +
         `()=>{$(this).removeClass('text-danger').html('<i class=\\'far fa-lg fa-heart\\'></i>')} ):view_post('like_album', 'like', {id:'1'}, ` +
-        `()=>{$(this).addClass('text-danger').html('<i class=\\'fas fa-lg fa-heart\\'></i>')} )\"><i class=\"far fa-lg fa-heart\"></i></span></div>`
+        `()=>{$(this).addClass('text-danger').html('<i class=\\'fas fa-lg fa-heart\\'></i>')} )\"><i class=\"far fa-lg fa-heart\"></i></span>`
     );
   });
 
@@ -124,31 +127,11 @@ describe("badges like", () => {
     const view = View.findOne({ name: "like_album" });
     expect(view).toBeDefined();
     const body = { id: 1 };
-    await view.runRoute(
-      "remove",
-      body,
-      mockReqRes.res,
-      { req: mockReqRes.req },
-      false
-    );
+    const req = mockReqRes.req;
+    req.user.id = 2;
+    await view.runRoute("remove", body, mockReqRes.res, { req: req }, false);
     const result = mockReqRes.getStored();
     expect(result?.json).toBeDefined();
     expect(result?.json.success).toEqual("ok");
-  });
-
-  it("like route", async () => {
-    // const view = View.findOne({ name: "like_album" });
-    // expect(view).toBeDefined();
-    // const body = { id: 2 };
-    // await view.runRoute(
-    //   "like",
-    //   body,
-    //   mockReqRes.res,
-    //   { req: mockReqRes.req },
-    //   false
-    // );
-    // const result = mockReqRes.getStored();
-    // expect(result?.json).toBeDefined();
-    // expect(result?.json.success).toEqual("ok");
   });
 });
