@@ -156,7 +156,7 @@ const runMany = async (
 ) => {
   const queryRes = queriesObj?.many_rows_query
     ? await queriesObj.many_rows_query(state)
-    : await manyRowsQueryImpl(state, table_id, viewname, { relation });
+    : await manyRowsQueryImpl(state, table_id, viewname, { relation }, extra);
   if (queryRes.error) throw new Error(queryRes.error);
   const { rows } = queryRes;
   return rows.map((row) => ({
@@ -182,7 +182,7 @@ const runMany = async (
 const rowQueryImpl = async (id, table_id, { relation }) => {
   if (!relation)
     return {
-      error: `Badges view ${viewname} incorrectly configured. No relation chosen`,
+      error: `Badges view incorrectly configured. No relation chosen`,
     };
   const relSplit = relation.split(".");
   if (relSplit.length < 3)
@@ -231,7 +231,13 @@ const rowQueryImpl = async (id, table_id, { relation }) => {
   }
 };
 
-const manyRowsQueryImpl = async (state, table_id, viewname, { relation }) => {
+const manyRowsQueryImpl = async (
+  state,
+  table_id,
+  viewname,
+  { relation },
+  extra
+) => {
   const tbl = Table.findOne({ id: table_id });
   const fields = tbl.getFields();
   const qstate = await stateFieldsToWhere({ fields, state });
@@ -300,12 +306,22 @@ module.exports = {
 
   run,
   runMany,
-  queries: ({ table_id, configuration: { relation, size, rounded_pill } }) => ({
+  queries: ({
+    table_id,
+    req,
+    configuration: { relation, size, rounded_pill },
+  }) => ({
     async row_query(id) {
       return await rowQueryImpl(id, table_id, { relation });
     },
     async many_rows_query(state) {
-      return await manyRowsQueryImpl(state, table_id, relation, { relation });
+      return await manyRowsQueryImpl(
+        state,
+        table_id,
+        relation,
+        { relation },
+        { req }
+      );
     },
   }),
 };
