@@ -18,9 +18,9 @@ const configuration_workflow = () =>
       {
         name: "Badge relation",
         form: async (context) => {
-          const table = await Table.findOne({ id: context.table_id });
+          const table = Table.findOne({ id: context.table_id });
           const mytable = table;
-          const fields = await table.getFields();
+          const fields = table.getFields();
           const { child_field_list, child_relations } =
             await table.get_child_relations();
           var agg_field_opts = [];
@@ -40,11 +40,11 @@ const configuration_workflow = () =>
                 f.type === "Key" && !["_sc_files"].includes(f.reftable_name)
             );
             for (const kf of keyFields) {
-              const joined_table = await Table.findOne({
+              const joined_table = Table.findOne({
                 name: kf.reftable_name,
               });
               if (!joined_table) continue;
-              await joined_table.getFields();
+              joined_table.getFields();
               joined_table.fields.forEach((jf) => {
                 if (jf.name !== kf.name)
                   agg_field_opts.push({
@@ -104,67 +104,63 @@ const run = async (
   viewname,
   { relation, size, rounded_pill },
   state,
-  extra
+  extra,
+  queriesObj
 ) => {
   const { id } = state;
   if (!id) return "need id";
-  if (!relation) {
-    throw new Error(
-      `Badges view ${viewname} incorrectly configured. No relation chosen`
-    );
-  }
-  const relSplit = relation.split(".");
-  if (relSplit.length < 3) {
-    throw new Error("badges view incorrectly configured. No relation chosen");
-  }
-  if (relSplit.length === 3) {
-    const [relTableNm, relField, valField] = relSplit;
-
-    const relTable = await Table.findOne({ name: relTableNm });
-    const rows = await relTable.getJoinedRows({
-      where: { [relField]: id },
-    });
-
-    return rows
-      .map((row) =>
-        span(
-          {
-            class: [
-              "badge",
-              bs5 ? "bg-secondary" : "badge-secondary",
-              size,
-              rounded_pill && "rounded-pill",
-            ],
-          },
-          row[valField]
+  const queryRes = queriesObj?.row_query
+    ? await queriesObj.row_query(id)
+    : await rowQueryImpl(id, table_id, { relation });
+  if (queryRes.error) throw new Error(queryRes.error);
+  const { rows, mode, valField } = queryRes;
+  return mode === "CHILD_TABLE"
+    ? rows
+        .map((row) =>
+          span(
+            {
+              class: [
+                "badge",
+                bs5 ? "bg-secondary" : "badge-secondary",
+                size,
+                rounded_pill && "rounded-pill",
+              ],
+            },
+            row[valField]
+          )
         )
-      )
-      .join("&nbsp;");
-  } else {
-    const [relTableNm, relField, joinFieldNm, valField] = relSplit;
-    const table = await Table.findOne({ id: table_id });
-
-    const relTable = await Table.findOne({ name: relTableNm });
-    await relTable.getFields();
-    const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
-
-    const rows = await table.getJoinedRows({
-      where: { id },
-      aggregations: {
-        _badges: {
-          table: joinField.reftable_name,
-          ref: "id",
-          subselect: {
-            field: joinFieldNm,
-            table: relTable,
-            whereField: relField,
-          },
-          field: valField,
-          aggregate: "ARRAY_AGG",
-        },
-      },
-    });
-    return (rows[0]._badges || [])
+        .join("&nbsp;")
+    : (rows[0]._badges || [])
+        .map((b) =>
+          span(
+            {
+              class: [
+                "badge",
+                bs5 ? "bg-secondary" : "badge-secondary",
+                size,
+                rounded_pill && "rounded-pill",
+              ],
+            },
+            b
+          )
+        )
+        .join("&nbsp;");
+};
+const runMany = async (
+  table_id,
+  viewname,
+  { relation, size, rounded_pill },
+  state,
+  extra,
+  queriesObj
+) => {
+  const queryRes = queriesObj?.many_rows_query
+    ? await queriesObj.many_rows_query(state)
+    : await manyRowsQueryImpl(state, table_id, viewname, { relation });
+  if (queryRes.error) throw new Error(queryRes.error);
+  const { rows } = queryRes;
+  return rows.map((row) => ({
+    html: (row._badges || [])
       .map((b) =>
         span(
           {
@@ -178,105 +174,123 @@ const run = async (
           b
         )
       )
-      .join("&nbsp;");
-  }
+      .join("&nbsp;"),
+    row,
+  }));
 };
-const runMany = async (
-  table_id,
-  viewname,
-  { relation, size, rounded_pill },
-  state,
-  extra
-) => {
-  const tbl = await Table.findOne({ id: table_id });
-  const fields = await tbl.getFields();
-  const qstate = await stateFieldsToWhere({ fields, state });
-  if (!relation) {
-    throw new Error(
-      `Badges view ${viewname} incorrectly configured. No relation chosen`
-    );
-  }
+
+const rowQueryImpl = async (id, table_id, { relation }) => {
+  if (!relation)
+    return {
+      error: `Badges view ${viewname} incorrectly configured. No relation chosen`,
+    };
   const relSplit = relation.split(".");
-  if (relSplit.length < 3) {
-    throw new Error("badges view incorrectly configured. No relation chosen");
-  }
+  if (relSplit.length < 3)
+    return {
+      error: "badges view incorrectly configured. No relation chosen",
+    };
+
   if (relSplit.length === 3) {
     const [relTableNm, relField, valField] = relSplit;
-    const rows = await tbl.getJoinedRows({
-      where: qstate,
-      aggregations: {
-        _badges: {
-          table: relTableNm,
-          ref: relField,
-          field: valField,
-          aggregate: "ARRAY_AGG",
-        },
-      },
-      ...(extra && extra.orderBy && { orderBy: extra.orderBy }),
-      ...(extra && extra.orderDesc && { orderDesc: extra.orderDesc }),
-    });
 
-    return rows.map((row) => ({
-      html: row._badges
-        .map((b) =>
-          span(
-            {
-              class: [
-                "badge",
-                bs5 ? "bg-secondary" : "badge-secondary",
-                size,
-                rounded_pill && "rounded-pill",
-              ],
-            },
-            b
-          )
-        )
-        .join("&nbsp;"),
-      row,
-    }));
+    const relTable = Table.findOne({ name: relTableNm });
+    return {
+      mode: "CHILD_TABLE",
+      valField,
+      rows: await relTable.getJoinedRows({
+        where: { [relField]: id },
+      }),
+    };
   } else {
     const [relTableNm, relField, joinFieldNm, valField] = relSplit;
+    const table = Table.findOne({ id: table_id });
 
-    const relTable = await Table.findOne({ name: relTableNm });
+    const relTable = Table.findOne({ name: relTableNm });
     await relTable.getFields();
     const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
 
-    const rows = await tbl.getJoinedRows({
-      where: qstate,
-      aggregations: {
-        _badges: {
-          table: joinField.reftable_name,
-          ref: "id",
-          subselect: {
-            field: joinFieldNm,
-            table: relTable,
-            whereField: relField,
-          },
-          field: valField,
-          aggregate: "ARRAY_AGG",
-        },
-      },
-    });
-    return rows.map((row) => ({
-      html: (row._badges || [])
-        .map((b) =>
-          span(
-            {
-              class: [
-                "badge",
-                bs5 ? "bg-secondary" : "badge-secondary",
-                size,
-                rounded_pill && "rounded-pill",
-              ],
+    return {
+      mode: "JOIN_TABLE",
+      rows: await table.getJoinedRows({
+        where: { id },
+        aggregations: {
+          _badges: {
+            table: joinField.reftable_name,
+            ref: "id",
+            subselect: {
+              field: joinFieldNm,
+              table: relTable,
+              whereField: relField,
             },
-            b
-          )
-        )
-        .join("&nbsp;"),
-      row,
-    }));
+            field: valField,
+            aggregate: "ARRAY_AGG",
+          },
+        },
+      }),
+    };
   }
 };
+
+const manyRowsQueryImpl = async (state, table_id, viewname, { relation }) => {
+  const tbl = Table.findOne({ id: table_id });
+  const fields = tbl.getFields();
+  const qstate = await stateFieldsToWhere({ fields, state });
+  if (!relation) {
+    return {
+      error: `Badges view ${viewname} incorrectly configured. No relation chosen`,
+    };
+  }
+  const relSplit = relation.split(".");
+  if (relSplit.length < 3) {
+    return {
+      error: "badges view incorrectly configured. No relation chosen",
+    };
+  }
+  if (relSplit.length === 3) {
+    const [relTableNm, relField, valField] = relSplit;
+    return {
+      rows: await tbl.getJoinedRows({
+        where: qstate,
+        aggregations: {
+          _badges: {
+            table: relTableNm,
+            ref: relField,
+            field: valField,
+            aggregate: "ARRAY_AGG",
+          },
+        },
+        ...(extra && extra.orderBy && { orderBy: extra.orderBy }),
+        ...(extra && extra.orderDesc && { orderDesc: extra.orderDesc }),
+      }),
+    };
+  } else {
+    const [relTableNm, relField, joinFieldNm, valField] = relSplit;
+
+    const relTable = Table.findOne({ name: relTableNm });
+    relTable.getFields();
+    const joinField = relTable.fields.find((f) => f.name === joinFieldNm);
+
+    return {
+      rows: await tbl.getJoinedRows({
+        where: qstate,
+        aggregations: {
+          _badges: {
+            table: joinField.reftable_name,
+            ref: "id",
+            subselect: {
+              field: joinFieldNm,
+              table: relTable,
+              whereField: relField,
+            },
+            field: valField,
+            aggregate: "ARRAY_AGG",
+          },
+        },
+      }),
+    };
+  }
+};
+
 module.exports = {
   name: "Badges",
   display_state_form: false,
@@ -286,4 +300,12 @@ module.exports = {
 
   run,
   runMany,
+  queries: ({ table_id, configuration: { relation, size, rounded_pill } }) => ({
+    async row_query(id) {
+      return await rowQueryImpl(id, table_id, { relation });
+    },
+    async many_rows_query(state) {
+      return await manyRowsQueryImpl(state, table_id, relation, { relation });
+    },
+  }),
 };
