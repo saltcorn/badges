@@ -323,16 +323,15 @@ const removeRouteImpl = async (id, value, { relation }) => {
   const joinTable = Table.findOne({ name: joinTableNm });
   await joinTable.getFields();
   const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
-  const schema = db.getTenantSchema();
-  await db.query(
-    `delete from "${schema}"."${db.sqlsanitize(joinTable.name)}" 
-    where "${db.sqlsanitize(relField)}"=$1 and 
-    "${db.sqlsanitize(joinFieldNm)}" in 
-    (select id from 
-      "${schema}"."${db.sqlsanitize(joinField.reftable_name)}" 
-      where "${db.sqlsanitize(valField)}"=$2)`,
-    [id, value]
-  );
+  const labelTbl = Table.findOne({ name: joinField.reftable_name });
+  const ids = (await labelTbl.getRows({ [valField]: value })).map((r) => r.id);
+  if (!db.isSQLite)
+    await joinTable.deleteRows({ [relField]: id, [joinFieldNm]: { in: ids } });
+  else
+    await joinTable.deleteRows({
+      [relField]: id,
+      or: ids.map((id) => ({ [joinFieldNm]: id })),
+    });
   return { success: "ok" };
 };
 
