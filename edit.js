@@ -222,7 +222,7 @@ const remove = async (
 ) => {
   const queryRes = queriesObj?.remove_route_query
     ? await queriesObj.remove_route_query(id, value)
-    : await removeRouteImpl(table_id, viewname, { relation }, { id, value });
+    : await removeRouteImpl(id, value, { relation }, extra.req);
   return { json: queryRes };
 };
 const add = async (
@@ -317,22 +317,26 @@ const editQueryImpl = async (
   return { existing, possibles };
 };
 
-const removeRouteImpl = async (id, value, { relation }) => {
+const removeRouteImpl = async (id, value, { relation }, req) => {
   const relSplit = relation.split(".");
   const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
   const joinTable = Table.findOne({ name: joinTableNm });
-  await joinTable.getFields();
   const joinField = joinTable.fields.find((f) => f.name === joinFieldNm);
-  const schema = db.getTenantSchema();
-  await db.query(
-    `delete from "${schema}"."${db.sqlsanitize(joinTable.name)}" 
-    where "${db.sqlsanitize(relField)}"=$1 and 
-    "${db.sqlsanitize(joinFieldNm)}" in 
-    (select id from 
-      "${schema}"."${db.sqlsanitize(joinField.reftable_name)}" 
-      where "${db.sqlsanitize(valField)}"=$2)`,
-    [id, value]
-  );
+  const labelTbl = Table.findOne({ name: joinField.reftable_name });
+  const ids = (await labelTbl.getRows({ [valField]: value })).map((r) => r.id);
+  if (!db.isSQLite)
+    await joinTable.deleteRows(
+      { [relField]: id, [joinFieldNm]: { in: ids } },
+      req?.user
+    );
+  else
+    await joinTable.deleteRows(
+      {
+        [relField]: id,
+        or: ids.map((id) => ({ [joinFieldNm]: id })),
+      },
+      req?.user
+    );
   return { success: "ok" };
 };
 
@@ -405,7 +409,7 @@ module.exports = {
       );
     },
     remove_route_query(id, value) {
-      return removeRouteImpl(id, value, { relation });
+      return removeRouteImpl(id, value, { relation }, req);
     },
     add_route_query(id, value) {
       return addRouteImpl(
