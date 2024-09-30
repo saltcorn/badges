@@ -88,7 +88,11 @@ const configuration_workflow = () =>
                 type: "Bool",
                 label: "Rounded pill appearance",
               },
-
+              {
+                name: "reload_after_edit",
+                type: "Bool",
+                label: "Reload page after edit",
+              },
               {
                 name: "where",
                 label: "Where",
@@ -246,6 +250,7 @@ const add = async (
     return {
       json: {
         success: "ok",
+        reload_page: queryRes.reload_page,
         new_badge: render1({ viewname, size, rounded_pill, id })(value),
       },
     };
@@ -317,7 +322,12 @@ const editQueryImpl = async (
   return { existing, possibles };
 };
 
-const removeRouteImpl = async (id, value, { relation }, req) => {
+const removeRouteImpl = async (
+  id,
+  value,
+  { relation, reload_after_edit },
+  req
+) => {
   const relSplit = relation.split(".");
   const [joinTableNm, relField, joinFieldNm, valField] = relSplit;
   const joinTable = Table.findOne({ name: joinTableNm });
@@ -337,13 +347,13 @@ const removeRouteImpl = async (id, value, { relation }, req) => {
       },
       req?.user
     );
-  return { success: "ok" };
+  return { success: "ok", reload_page: reload_after_edit === true };
 };
 
 const addRouteImpl = async (
   table_id,
   { id, value },
-  { relation, field_values_formula },
+  { relation, field_values_formula, reload_after_edit },
   req
 ) => {
   const table = Table.findOne({ id: table_id });
@@ -370,7 +380,7 @@ const addRouteImpl = async (
     [joinFieldNm]: joinedRow.id,
     ...extra,
   });
-  return { success: "ok" };
+  return { success: "ok", reload_page: reload_after_edit === true };
 };
 module.exports = {
   name: "EditBadges",
@@ -390,6 +400,7 @@ module.exports = {
       rounded_pill,
       where,
       field_values_formula,
+      reload_after_edit,
     },
     req,
     res,
@@ -409,7 +420,7 @@ module.exports = {
       );
     },
     remove_route_query(id, value) {
-      return removeRouteImpl(id, value, { relation }, req);
+      return removeRouteImpl(id, value, { relation, reload_after_edit }, req);
     },
     add_route_query(id, value) {
       return addRouteImpl(
@@ -418,7 +429,7 @@ module.exports = {
           id,
           value,
         },
-        { relation, field_values_formula },
+        { relation, field_values_formula, reload_after_edit },
         req
       );
     },
