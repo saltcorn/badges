@@ -119,7 +119,7 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
   },
 ];
 
-const escapeSingleQuotes = (s) => s.replace(/'/g, "\\'");
+const escapeSingleQuotes = (s) => (s ? s.replace(/'/g, "\\'") : "");
 
 const render1 =
   ({ size, rounded_pill, viewname, id }) =>
