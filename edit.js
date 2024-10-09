@@ -119,6 +119,8 @@ const get_state_fields = async (table_id, viewname, { columns }) => [
   },
 ];
 
+const escapeSingleQuotes = (s) => s.replace(/'/g, "\\'");
+
 const render1 =
   ({ size, rounded_pill, viewname, id }) =>
   (b) =>
@@ -134,7 +136,9 @@ const render1 =
       b,
       a(
         {
-          onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${b}'}, function(){$(that).closest('span').remove()})})(this);`,
+          onclick: `(function(that){view_post('${viewname}', 'remove', {id:'${id}', value: '${escapeSingleQuotes(
+            b
+          )}'}, function(){$(that).closest('span').remove()})})(this);`,
         },
         i({ class: "ms-1 fas fa-lg fa-times" })
       )
@@ -195,7 +199,7 @@ const run = async (
             a(
               {
                 class: "dropdown-item",
-                onclick: `set_add_badge_${rndid}('${p}')`,
+                onclick: `set_add_badge_${rndid}('${escapeSingleQuotes(p)}')`,
               },
               p
             )

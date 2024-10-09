@@ -85,6 +85,16 @@ describe("badges edit", () => {
     expect(result?.json).toBeDefined();
     expect(result?.json.success).toEqual("ok");
   });
+
+  it("Edit A view issue 2567", async () => {
+    const view = View.findOne({ name: "EditA" });
+    expect(view).toBeDefined();
+    const result = await view.run({ id: 1 }, mockReqRes);
+    expect(result).toContain(
+      `(function(that){view_post('ABEditBadges', 'remove', {id:'1', value: 'Blue\\'s'}, function(){$(that).closest('span').remove()})})(this);`
+    );
+    expect(result).toContain("('Blue\\'s')"); // set_add_badge_bs with random id, so just check for the string in parentheses
+  });
 });
 
 describe("badges like", () => {
